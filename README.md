@@ -128,54 +128,69 @@ erDiagram
 ```mermaid
 flowchart TD
   
-    Start(["Início"]) --> Auth["Autenticação JWT"]
-    Auth -- "Login Válido" --> UserSession["Sessão Usuário"]
-    Auth -- "Falha" --> Error401["Erro 401: Unauthorized"]
+    Start(["Início"]) --> Dashboard["Dashboard Principal"]
     
-    UserSession --> Dashboard["Dashboard Principal"]
     Dashboard -- "Operações" --> TaskFlow
     Dashboard -- "Operações" --> CategoryFlow
     Dashboard -- "Visualização" --> HistoryFlow
 
+    %% ---------------- TASK FLOW ----------------
     subgraph TaskFlow ["Gestão de Tarefas"]
         direction TB
         
+        %% CREATE
         T1["CRIAR TAREFA"] --> T1a["Definir Dados"]
-        T1a --> T1b["Status Inicial: 'pendente'<br>Registra Histórico de Criação"]
+        T1a --> T1a1{"Prioridade Informada?"}
+        T1a1 -- "Não" --> T1a2["Define Prioridade = 2 (Normal)"]
+        T1a1 -- "Sim" --> T1b
+        
+        T1a2 --> T1b
+        T1b["Status Inicial: 'pendente'<br>created_at = NOW()"]
 
-        T2["ATUALIZAR TAREFA"] --> T0{"Tarefa Editável?"}
-        T0 -- "Não: Deletada ou Concluída" --> T_Locked["Erro: Registro Imutável"]
+        %% UPDATE
+        T2["ATUALIZAR TAREFA"] --> T0{"Status = 'em_andamento'?"}
+        T0 -- "Não" --> T_Locked["Erro: Task Não Editável"]
         
         T0 -- "Sim" --> T2a{"Alterar Status?"}
-        T2a -- "Não" --> T2e["Atualizar Nome/Descrição/Prioridade"]
+        T2a -- "Não" --> T2e["Atualizar Nome / Descrição / Prioridade<br>(Sem Log)"]
         
-        T2a -- "Sim" --> T2b{"Validar Transição?"}
-        T2b -- "Retrocesso" --> T_Err["Erro: Retrocesso Proibido"]
+        T2a -- "Sim" --> T2b{"Transição Permitida?"}
+        T2b -- "em_andamento → pendente" --> T_Err["Erro: Retrocesso Proibido"]
         T2b -- "Inválida" --> T_Err2["Erro: Transição Não Permitida"]
-        T2b -- "Válida" --> T2d["Atualizar Status<br>Registra Histórico de Alteração"]
-        
-        T2d --> T2f{"Novo status é 'concluída'?"}
-        T2f -- "Sim" --> T4["Definir Data de Conclusão"]
+        T2b -- "Válida" --> T2d["Atualizar Status<br>Registra HISTORY"]
 
-        T3["EXCLUIR TAREFA"] --> T3a{"Status: 'em_andamento'?"}
-        T3a -- "Não" --> T3b["Erro: Apenas tarefas em andamento"]
-        T3a -- "Sim" --> T3c["Aplicar Soft Delete<br>Registra Histórico de Exclusão"]
+        T2d --> T2f{"Novo status = 'concluída'?"}
+        T2f -- "Sim" --> T4["Define completed_at = NOW()"]
+        T2f -- "Não" --> T2e2["Retorna sucesso"]
+
+        %% DELETE
+        T3["EXCLUIR TAREFA"] --> T3a{"Status = 'em_andamento'?"}
+        T3a -- "Não" --> T3b["Erro: Exclusão Permitida Apenas em Andamento"]
+        T3a -- "Sim" --> T3c["Soft Delete<br>deleted_at = NOW()<br>Registra HISTORY"]
+        
+        %% FILTER
+        T5["FILTRAR TAREFAS"] --> T5a["Aplica Filtros Informados"]
     end
 
+    %% ---------------- CATEGORY FLOW ----------------
     subgraph CategoryFlow ["Gestão de Categorias"]
+        direction TB
+
         C1["CRIAR CATEGORIA"] --> C1a{"É Admin?"}
-        C1a -- "Sim" --> C1b["Pode criar Categoria Global"]
-        C1a -- "Não" --> C1c["Cria Categoria Privada"]
+        C1a -- "Sim" --> C1b["Categoria Global (user_id = NULL)"]
+        C1a -- "Não" --> C1c["Categoria Privada (user_id = logado)"]
         
-        C2["ASSOCIAR TAREFA"] --> C2a{"Dono ou Categoria Global?"}
+        C2["ASSOCIAR TAREFA À CATEGORIA"] --> C2a{"Dono ou Categoria Global?"}
         C2a -- "Não" --> C2b["Erro 403: Forbidden"]
-        C2a -- "Sim" --> C2c["Vincular Tarefa à Categoria"]
+        C2a -- "Sim" --> C2c["Vincula TASK_CATEGORY"]
     end
 
-
+    %% ---------------- HISTORY FLOW ----------------
     subgraph HistoryFlow ["Auditoria Imutável"]
-        H1["VISUALIZAR HISTÓRICO"] --> H1a["Consulta Logs de Status"]
-        H1a --> H1b["Registros não podem ser apagados ou alterados"]
+        direction TB
+
+        H1["VISUALIZAR HISTÓRICO"] --> H1a["Consulta TASK_STATUS_HISTORY"]
+        H1a --> H1b["Somente Alterações de Status<br>Sem Update / Delete"]
     end
 ```
 
