@@ -35,6 +35,39 @@ Este projeto foi desenhado para servir como um modelo de backend escalável, apr
 * **Banco de dados**: MySQL
 
 ---
+## Regras de Negócio 
+
+| ID    | Regra                          | Descrição                                                                 | Justificativa                                                                                                   |
+|------ |--------------------------------|---------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| RN-01 | Imutabilidade de Tarefa Inativa | A edição de dados e exclusão só são permitidas se o status for `em_andamento`. | Garante que o usuário só altere o escopo de tarefas ativas, preservando o histórico do que já foi feito ou não iniciado. |
+| RN-02 | Prioridade Padrão               | Se a prioridade não for informada na criação, o sistema atribui automaticamente `2 (Normal)`. | Evita inconsistência no banco de dados e garante que toda tarefa tenha um peso para ordenação.                  |
+| RN-03 | Bloqueio de Retrocesso          | É proibido transitar uma tarefa de `em_andamento` para `pendente`.           | Preserva o fluxo lógico de progresso; uma tarefa iniciada deve ser concluída ou cancelada, nunca “reiniciada”. |
+| RN-04 | Exclusão Condicional            | O Soft Delete só é permitido se a tarefa estiver `em_andamento`.            | Previne a remoção acidental de tarefas finalizadas ou que ainda não começaram.                                  |
+| RN-05 | Auditoria Seletiva              | Apenas alterações de **Status** geram log em `HISTORY`.                   | Evita poluição com alterações triviais, focando no ciclo de vida da tarefa.                                     |
+| RN-06 | Escopo de Categorias            | Apenas Admin cria categorias Globais. Usuários comuns criam categorias Privadas. | Mantém a organização do sistema e evita poluição da lista global.                                               |
+| RN-07 | Segurança na Associação         | O usuário só pode vincular tarefas a categorias que possui ou que são Globais. | Previne acesso indevido e manipulação de recursos de terceiros.                                                 |
+
+---
+
+## Definição Status
+
+**pendente:**
+- Task criada com data de criação.
+- Nenhuma ação iniciada.
+- Não permite edição nem exclusão.
+
+**em_andamento:**
+- Task iniciada pelo usuário.
+- Permite edição e exclusão (soft delete).
+- Permite transição para concluída.
+
+**concluída:**
+- Task finalizada com registro de data de conclusão.
+- Registro imutável.
+- Apenas visualização.
+
+---
+
 
 ## Diagrama DB
 
